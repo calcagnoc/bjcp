@@ -141,6 +141,14 @@ a.beer::before{
   content:"";width:7px;height:7px;border-radius:50%;
   background:var(--brass);opacity:.55;flex:none;
 }
+a.beer::after{
+  content:"↗";font-size:11px;opacity:.5;margin-left:1px;
+}
+a.beer:hover::after{opacity:.9}
+.exnote{
+  flex-basis:100%;font-size:11.5px;color:var(--muted);
+  margin-top:3px;letter-spacing:.01em;
+}
 a.beer:hover{background:#fff;border-color:var(--brass);color:var(--ink)}
 a.beer:hover::before{opacity:1}
 a.beer:focus-visible{outline:2px solid var(--focus);outline-offset:1px}
@@ -194,6 +202,60 @@ a.beer:focus-visible{outline:2px solid var(--focus);outline-offset:1px}
 .mini:hover{border-color:var(--ink-soft);color:var(--ink)}
 .mini.danger:hover{border-color:#B03A2E;color:#B03A2E}
 .mini:focus-visible{outline:2px solid var(--focus);outline-offset:1px}
+/* ---------- pannello importazione ---------- */
+#importpanel{max-width:1080px;margin:16px auto 0;padding:0 20px}
+#importpanel[hidden]{display:none}
+.panelhead{
+  display:flex;align-items:center;gap:12px;flex-wrap:wrap;
+  background:#FFF6DC;border:1px solid #E3CE94;border-radius:8px 8px 0 0;
+  padding:11px 14px;font-size:13px;color:var(--ink-soft);
+}
+.panelhead strong{font-size:14px;color:var(--ink)}
+.panelhead .mini{margin-left:auto}
+.pend{
+  display:flex;align-items:center;gap:9px;flex-wrap:wrap;
+  background:var(--card);border:1px solid var(--rule);border-top:0;
+  padding:10px 14px;
+}
+.pend:last-child{border-radius:0 0 8px 8px}
+.pendinfo{flex:1 1 260px;min-width:0;display:flex;flex-direction:column;gap:1px}
+.pendinfo b{font-size:14.5px}
+.pendinfo span{font-size:12px;color:var(--muted)}
+.pendinfo em{font-size:12.5px;color:var(--ink-soft);font-style:italic}
+.assign{
+  font:inherit;font-size:13px;padding:6px 9px;min-width:230px;flex:1 1 230px;
+  border:1px solid var(--rule);border-radius:6px;background:#fff;color:var(--ink);
+}
+.assign:focus{outline:2px solid var(--focus);outline-offset:1px}
+
+/* ---------- degustazioni ---------- */
+.tasting{margin-top:20px;padding-top:14px;border-top:1px dotted var(--rule)}
+.tastehead{
+  font-size:11px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;
+  color:var(--brass);margin-bottom:7px;
+}
+.tastehead span{color:var(--muted);font-weight:400}
+.tnote{background:#FAFBF9;border:1px solid var(--rule);border-radius:7px;padding:8px 11px;margin-bottom:6px}
+.tline{display:flex;align-items:center;gap:9px;flex-wrap:wrap;font-size:14px}
+.tbrew{color:var(--muted);font-size:12.5px}
+.tstars{color:var(--brass);letter-spacing:1px;font-size:12px}
+.tnum{font-family:var(--mono);font-size:11px;color:var(--muted);letter-spacing:0}
+.tdate{font-family:var(--mono);font-size:11px;color:var(--muted);margin-left:auto}
+.tdel{border:0;background:transparent;color:var(--muted);cursor:pointer;font-size:17px;line-height:1;padding:0 4px;border-radius:4px}
+.tdel:hover{color:#B03A2E;background:var(--enamel-deep)}
+.tnote p{margin:4px 0 0;font-size:13.5px;color:var(--ink-soft)}
+.tadd{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:8px}
+.tadd input,.tadd select{
+  font:inherit;font-size:13px;padding:6px 9px;border:1px dashed var(--rule);
+  border-radius:6px;background:transparent;color:var(--ink);
+}
+.tadd .tbeer{flex:1 1 170px;min-width:0}
+.tadd .tcomment{flex:2 1 220px;min-width:0}
+.tadd input:focus,.tadd select:focus{outline:2px solid var(--focus);outline-offset:1px;background:#fff;border-color:transparent}
+@media (max-width:640px){
+  #importpanel{padding:0 16px}
+  .tdate{margin-left:0}
+}
 .srmline{
   font-family:var(--mono);font-size:11px;color:var(--muted);
   margin-top:16px;padding-top:12px;border-top:1px dotted var(--rule);
@@ -230,7 +292,7 @@ mark{background:#FBE9A7;color:inherit;border-radius:2px;padding:0 1px}
   <div class="masthead-inner">
     <div class="brandline">
       <h1 class="brand">BJCP 2021 <em>· Linee guida stili birrari</em></h1>
-      <div class="tally"><b id="count">114</b> stili · <span id="catcount">34</span> categorie · <span class="ver">v7</span></div>
+      <div class="tally"><b id="count">114</b> stili · <span id="catcount">34</span> categorie · <span class="ver">v9</span></div>
     </div>
 
     <div class="searchwrap">
@@ -253,6 +315,8 @@ mark{background:#FBE9A7;color:inherit;border-radius:2px;padding:0 1px}
           </select>
         </label>
         <span id="edits">nessuna modifica</span>
+        <button id="impUntappd" class="mini">Importa Untappd</button>
+        <input type="file" id="untappdFile" accept=".json,.csv,application/json,text/csv" hidden>
         <button id="export" class="mini">Esporta</button>
         <button id="import" class="mini">Importa</button>
         <button id="reset" class="mini danger" hidden>Azzera</button>
@@ -262,6 +326,7 @@ mark{background:#FBE9A7;color:inherit;border-radius:2px;padding:0 1px}
   </div>
 </header>
 
+<section id="importpanel" hidden></section>
 <main id="list" role="region" aria-live="polite"></main>
 
 <script>
@@ -342,6 +407,12 @@ function beerUrl(name){
   }
 }
 
+function destLabel(){
+  return destSel.value === 'untappd' ? 'Untappd'
+       : destSel.value === 'images'  ? 'Google Immagini'
+       : 'Untappd tramite Google';
+}
+
 destSel.addEventListener('change', ()=>{
   try { localStorage.setItem(DEST_KEY, destSel.value); } catch(e){}
   render();
@@ -385,9 +456,13 @@ function setList(key, kind, arr){
 
 function updateEditBadge(){
   const n = Object.keys(store).length;
+  const t = Object.values(taste||{}).reduce((a,b)=>a+b.length,0);
   const el = document.getElementById('edits');
-  el.textContent = n ? `${n} stili modificati` : 'nessuna modifica';
-  document.getElementById('reset').hidden = !n;
+  const bits = [];
+  if(n) bits.push(`${n} stili modificati`);
+  if(t) bits.push(`${t} degustazioni`);
+  el.textContent = bits.length ? bits.join(' · ') : 'nessuna modifica';
+  document.getElementById('reset').hidden = !(n || t);
 }
 
 function renderIngRow(dd){
@@ -503,7 +578,8 @@ function render(){
         `<a class="beer" target="_blank" rel="noopener noreferrer"
             href="${beerUrl(b.q)}"
             title="Cerca «${esc(b.t)}»">${mark(b.t, deep?term:'')}</a>`
-      ).join('') + `</dd>` : '';
+      ).join('') +
+      `<span class="exnote">I nomi aprono la ricerca su ${destLabel()}</span></dd>` : '';
     const srm = d.srm
       ? `<div class="srmline">Colore SRM ${d.srm}</div>`
       : `<div class="srmline">Parametri variabili in base allo stile di base</div>`;
@@ -529,10 +605,11 @@ function render(){
         </span>
         <span class="stats">${statBlock('IBU', d.ibu)}${statBlock('ABV', d.abv)}</span>
       </button>
-      <div class="detail"><dl>${body}${ex}</dl>${ing}${srm}</div>
+      <div class="detail"><dl>${body}${ex}</dl>${ing}<div class="tasting" data-key="${esc(keyOf(d))}"></div>${srm}</div>
     </article>`;
   }).join('');
   refreshAllIngRows();
+  refreshAllTasting();
 }
 
 results.addEventListener('click', e=>{
@@ -552,8 +629,229 @@ document.addEventListener('keydown', e=>{
   if(e.key === 'Escape' && document.activeElement === q){ q.value=''; render(); }
 });
 
+/* ---------- degustazioni ---------- */
+const TASTE_KEY = 'bjcp2021_degustazioni_v1';
+const PEND_KEY  = 'bjcp2021_import_pending_v1';
+const MAP_KEY   = 'bjcp2021_stylemap_v1';
+
+let taste = {};   // { chiaveStile: [ {beer,brewery,rating,note,date} ] }
+let pending = []; // check-in importati e non ancora assegnati
+let learned = {}; // { "stile untappd": "chiaveStile" }  — imparato dalle TUE scelte
+
+try { taste   = JSON.parse(localStorage.getItem(TASTE_KEY) || '{}'); } catch(e){}
+try { pending = JSON.parse(localStorage.getItem(PEND_KEY)  || '[]'); } catch(e){}
+try { learned = JSON.parse(localStorage.getItem(MAP_KEY)   || '{}'); } catch(e){}
+
+function saveTaste(){
+  try{
+    localStorage.setItem(TASTE_KEY, JSON.stringify(taste));
+    localStorage.setItem(PEND_KEY,  JSON.stringify(pending));
+    localStorage.setItem(MAP_KEY,   JSON.stringify(learned));
+  }catch(e){ alert('Spazio esaurito nel browser: usa Esporta per salvare.'); }
+  updateEditBadge();
+}
+
+const STYLE_OPTIONS = DATA.map(d=>({
+  key: keyOf(d),
+  label: (d.code ? d.code + ' — ' : '') + d.name + ' · ' + d.cat
+}));
+
+function styleDatalist(){
+  return `<datalist id="stylelist">` +
+    STYLE_OPTIONS.map(o=>`<option value="${esc(o.label)}"></option>`).join('') +
+    `</datalist>`;
+}
+function keyFromLabel(label){
+  const hit = STYLE_OPTIONS.find(o=>o.label === label);
+  return hit ? hit.key : null;
+}
+function labelFromKey(key){
+  const hit = STYLE_OPTIONS.find(o=>o.key === key);
+  return hit ? hit.label : '';
+}
+
+/* ---------- lettura del file Untappd ---------- */
+function parseCSV(text){
+  const rows=[]; let row=[], cur='', q=false;
+  for(let i=0;i<text.length;i++){
+    const c=text[i];
+    if(q){
+      if(c==='"'){ if(text[i+1]==='"'){cur+='"';i++;} else q=false; }
+      else cur+=c;
+    } else if(c==='"') q=true;
+    else if(c===','){ row.push(cur); cur=''; }
+    else if(c==='\n'){ row.push(cur); rows.push(row); row=[]; cur=''; }
+    else if(c!=='\r') cur+=c;
+  }
+  if(cur||row.length){ row.push(cur); rows.push(row); }
+  if(!rows.length) return [];
+  const head = rows.shift().map(h=>h.trim().toLowerCase());
+  return rows.filter(r=>r.length>1).map(r=>{
+    const o={}; head.forEach((h,i)=>o[h]=(r[i]||'').trim()); return o;
+  });
+}
+
+function normaliseCheckin(o){
+  const g = (...keys)=>{ for(const k of keys){ if(o[k]!=null && o[k]!=='') return String(o[k]); } return ''; };
+  return {
+    beer:    g('beer_name','beer'),
+    brewery: g('brewery_name','brewery'),
+    ustyle:  g('beer_type','beer_style','type','style'),
+    rating:  g('rating_score','rating'),
+    note:    g('comment','checkin_comment','notes'),
+    date:    g('created_at','date').slice(0,16),
+  };
+}
+
+function loadUntappd(text, name){
+  let raw = [];
+  if(/\.csv$/i.test(name) || text.trim()[0] !== '[' && text.trim()[0] !== '{'){
+    raw = parseCSV(text);
+  } else {
+    const j = JSON.parse(text);
+    raw = Array.isArray(j) ? j : (j.checkins || j.response?.checkins?.items || []);
+    raw = raw.map(x => x.beer ? Object.assign({}, x, {
+      beer_name: x.beer.beer_name, beer_type: x.beer.beer_style,
+      brewery_name: x.brewery?.brewery_name, comment: x.checkin_comment
+    }) : x);
+  }
+  const items = raw.map(normaliseCheckin).filter(c=>c.beer);
+  if(!items.length){ alert('Non ho trovato check-in in questo file.'); return; }
+  pending = pending.concat(items);
+  saveTaste();
+  renderPanel();
+  document.getElementById('importpanel').scrollIntoView({behavior:'smooth'});
+}
+
+/* ---------- pannello di assegnazione ---------- */
+function renderPanel(){
+  const panel = document.getElementById('importpanel');
+  if(!pending.length){ panel.hidden = true; panel.innerHTML=''; return; }
+  panel.hidden = false;
+  panel.innerHTML = `
+    <div class="panelhead">
+      <strong>${pending.length} recensioni da assegnare</strong>
+      <span>Scegli tu a quale stile BJCP appartiene ciascuna birra.</span>
+      <button id="dropall" class="mini danger">Scarta tutte</button>
+    </div>
+    ${styleDatalist()}
+    ${pending.map((c,i)=>`
+      <div class="pend" data-i="${i}">
+        <div class="pendinfo">
+          <b>${esc(c.beer)}</b>
+          <span>${esc([c.brewery, c.ustyle, c.rating ? '★ '+c.rating : ''].filter(Boolean).join(' · '))}</span>
+          ${c.note ? `<em>${esc(c.note)}</em>` : ''}
+        </div>
+        <input class="assign" list="stylelist" placeholder="cerca lo stile…"
+               value="${esc(learned[c.ustyle] ? labelFromKey(learned[c.ustyle]) : '')}"
+               aria-label="Stile a cui assegnare ${esc(c.beer)}">
+        <button class="mini ok">Assegna</button>
+        <button class="mini skip">Scarta</button>
+      </div>`).join('')}`;
+}
+
+document.getElementById('impUntappd').onclick = ()=> document.getElementById('untappdFile').click();
+document.getElementById('untappdFile').onchange = ev=>{
+  const f = ev.target.files[0]; if(!f) return;
+  const fr = new FileReader();
+  fr.onload = ()=>{ try{ loadUntappd(fr.result, f.name); }catch(e){ alert('File non leggibile: '+e.message); } };
+  fr.readAsText(f);
+  ev.target.value='';
+};
+
+document.getElementById('importpanel').addEventListener('click', e=>{
+  if(e.target.id === 'dropall'){
+    if(confirm('Scarto tutte le recensioni non ancora assegnate?')){ pending=[]; saveTaste(); renderPanel(); }
+    return;
+  }
+  const row = e.target.closest('.pend'); if(!row) return;
+  const i = +row.dataset.i, c = pending[i];
+  if(e.target.classList.contains('skip')){
+    pending.splice(i,1); saveTaste(); renderPanel(); return;
+  }
+  if(e.target.classList.contains('ok')){
+    const label = row.querySelector('.assign').value.trim();
+    const key = keyFromLabel(label);
+    if(!key){ alert('Scegli uno stile dall\'elenco.'); return; }
+    (taste[key] = taste[key] || []).push({
+      beer:c.beer, brewery:c.brewery, rating:c.rating, note:c.note, date:c.date, src:'untappd'
+    });
+    if(c.ustyle) learned[c.ustyle] = key;   // ricorda la TUA scelta per le prossime
+    pending.splice(i,1);
+    saveTaste(); renderPanel(); refreshAllTasting();
+  }
+});
+
+/* ---------- degustazioni nella scheda ---------- */
+function stars(r){
+  const n = parseFloat(r);
+  if(isNaN(n)) return '';
+  const full = Math.floor(n), half = (n - full) >= 0.25 && (n - full) < 0.75;
+  const up = (n - full) >= 0.75 ? 1 : 0;
+  const s = '★'.repeat(full + up) + (half ? '½' : '');
+  return s + ' <span class="tnum">' + String(n).replace('.', ',') + '</span>';
+}
+function renderTasting(el){
+  const key = el.dataset.key, list = taste[key] || [];
+  el.innerHTML = `
+    <div class="tastehead">Le mie degustazioni${list.length?` <span>(${list.length})</span>`:''}</div>
+    ${list.map((t,i)=>`
+      <div class="tnote">
+        <div class="tline">
+          <b>${esc(t.beer)}</b>
+          ${t.brewery?`<span class="tbrew">${esc(t.brewery)}</span>`:''}
+          ${t.rating?`<span class="tstars" title="${esc(t.rating)}">${stars(t.rating)}</span>`:''}
+          ${t.date?`<span class="tdate">${esc(t.date)}</span>`:''}
+          <button class="tdel" data-i="${i}" aria-label="Elimina">×</button>
+        </div>
+        ${t.note?`<p>${esc(t.note)}</p>`:''}
+      </div>`).join('')}
+    <div class="tadd">
+      <input class="tbeer" placeholder="birra assaggiata…" aria-label="Nome birra">
+      <select class="trate" aria-label="Voto">
+        <option value="">voto</option>
+        ${[5,4.5,4,3.5,3,2.5,2,1.5,1].map(v=>`<option value="${v}">${v}</option>`).join('')}
+      </select>
+      <input class="tcomment" placeholder="le tue note…" aria-label="Note">
+      <button class="mini tsave">Aggiungi</button>
+    </div>`;
+}
+function refreshAllTasting(){ document.querySelectorAll('.tasting').forEach(renderTasting); }
+
+results.addEventListener('click', e=>{
+  const del = e.target.closest('.tdel');
+  if(del){
+    e.stopPropagation();
+    const el = del.closest('.tasting');
+    taste[el.dataset.key].splice(+del.dataset.i,1);
+    if(!taste[el.dataset.key].length) delete taste[el.dataset.key];
+    saveTaste(); renderTasting(el); return;
+  }
+  if(e.target.classList.contains('tsave')){
+    e.stopPropagation();
+    const el = e.target.closest('.tasting');
+    const beer = el.querySelector('.tbeer').value.trim();
+    if(!beer){ el.querySelector('.tbeer').focus(); return; }
+    (taste[el.dataset.key] = taste[el.dataset.key] || []).push({
+      beer, rating: el.querySelector('.trate').value,
+      note: el.querySelector('.tcomment').value.trim(),
+      date: new Date().toISOString().slice(0,10), src:'manuale'
+    });
+    saveTaste(); renderTasting(el); return;
+  }
+  if(e.target.closest('.tadd')) e.stopPropagation();
+});
+results.addEventListener('keydown', e=>{
+  if(e.target.classList.contains('tbeer') || e.target.classList.contains('tcomment')){
+    e.stopPropagation();
+    if(e.key==='Enter') e.target.closest('.tadd').querySelector('.tsave').click();
+  }
+});
+
+
 document.getElementById('export').onclick = ()=>{
-  const blob = new Blob([JSON.stringify(store,null,2)], {type:'application/json'});
+  const payload = {v:2, ingredienti:store, degustazioni:taste, mappature:learned};
+  const blob = new Blob([JSON.stringify(payload,null,2)], {type:'application/json'});
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
   a.download = 'bjcp-ingredienti.json';
@@ -568,19 +866,27 @@ document.getElementById('file').onchange = ev=>{
   fr.onload = ()=>{
     try{
       const inc = JSON.parse(fr.result);
-      Object.keys(inc).forEach(k=>{ store[k] = Object.assign(store[k]||{}, inc[k]); });
-      saveStore(); refreshAllIngRows();
+      if(inc && inc.v === 2){
+        Object.keys(inc.ingredienti||{}).forEach(k=>{ store[k] = Object.assign(store[k]||{}, inc.ingredienti[k]); });
+        Object.keys(inc.degustazioni||{}).forEach(k=>{ taste[k] = (taste[k]||[]).concat(inc.degustazioni[k]); });
+        learned = Object.assign(learned, inc.mappature||{});
+      } else {
+        Object.keys(inc).forEach(k=>{ store[k] = Object.assign(store[k]||{}, inc[k]); });
+      }
+      saveStore(); saveTaste(); refreshAllIngRows(); refreshAllTasting();
     }catch(e){ alert('File non valido: attendevo un JSON esportato da questa pagina.'); }
   };
   fr.readAsText(f);
   ev.target.value = '';
 };
 document.getElementById('reset').onclick = ()=>{
-  if(!confirm('Cancello tutte le modifiche a luppoli e malti e torno ai valori delle linee guida?')) return;
-  store = {}; saveStore(); refreshAllIngRows();
+  if(!confirm('Cancello TUTTO: modifiche a luppoli/malti e tutte le degustazioni salvate?')) return;
+  store = {}; taste = {}; pending = []; learned = {};
+  saveStore(); saveTaste(); refreshAllIngRows(); refreshAllTasting(); renderPanel();
 };
 
 render();
+renderPanel();
 updateEditBadge();
 </script>
 </body>
