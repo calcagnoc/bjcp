@@ -212,6 +212,7 @@ a.beer:focus-visible{outline:2px solid var(--focus);outline-offset:1px}
 }
 .panelhead strong{font-size:14px;color:var(--ink)}
 .panelhead .mini{margin-left:auto}
+.skipnote{color:#8A6D1F}
 .pend{
   display:flex;align-items:center;gap:9px;flex-wrap:wrap;
   background:var(--card);border:1px solid var(--rule);border-top:0;
@@ -244,14 +245,15 @@ a.beer:focus-visible{outline:2px solid var(--focus);outline-offset:1px}
 .tdel{border:0;background:transparent;color:var(--muted);cursor:pointer;font-size:17px;line-height:1;padding:0 4px;border-radius:4px}
 .tdel:hover{color:#B03A2E;background:var(--enamel-deep)}
 .tnote p{margin:4px 0 0;font-size:13.5px;color:var(--ink-soft)}
-.tadd{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:8px}
-.tadd input,.tadd select{
-  font:inherit;font-size:13px;padding:6px 9px;border:1px dashed var(--rule);
-  border-radius:6px;background:transparent;color:var(--ink);
+.tbeerlink{
+  font-weight:700;font-size:14px;color:var(--ink);text-decoration:none;
+  border-bottom:1px solid var(--rule);
 }
-.tadd .tbeer{flex:1 1 170px;min-width:0}
-.tadd .tcomment{flex:2 1 220px;min-width:0}
-.tadd input:focus,.tadd select:focus{outline:2px solid var(--focus);outline-offset:1px;background:#fff;border-color:transparent}
+.tbeerlink::after{content:"↗";font-size:10px;opacity:.5;margin-left:3px;font-weight:400}
+.tbeerlink:hover{color:var(--brass);border-bottom-color:var(--brass)}
+.tbeerlink:hover::after{opacity:.9}
+.tbeerlink:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+.tasting[hidden]{display:none}
 @media (max-width:640px){
   #importpanel{padding:0 16px}
   .tdate{margin-left:0}
@@ -292,7 +294,7 @@ mark{background:#FBE9A7;color:inherit;border-radius:2px;padding:0 1px}
   <div class="masthead-inner">
     <div class="brandline">
       <h1 class="brand">BJCP 2021 <em>· Linee guida stili birrari</em></h1>
-      <div class="tally"><b id="count">114</b> stili · <span id="catcount">34</span> categorie · <span class="ver">v9</span></div>
+      <div class="tally"><b id="count">114</b> stili · <span id="catcount">34</span> categorie · <span class="ver">v11</span></div>
     </div>
 
     <div class="searchwrap">
@@ -636,6 +638,7 @@ const MAP_KEY   = 'bjcp2021_stylemap_v1';
 
 let taste = {};   // { chiaveStile: [ {beer,brewery,rating,note,date} ] }
 let pending = []; // check-in importati e non ancora assegnati
+let lastSkipped = 0;
 let learned = {}; // { "stile untappd": "chiaveStile" }  — imparato dalle TUE scelte
 
 try { taste   = JSON.parse(localStorage.getItem(TASTE_KEY) || '{}'); } catch(e){}
@@ -700,6 +703,8 @@ function normaliseCheckin(o){
     rating:  g('rating_score','rating'),
     note:    g('comment','checkin_comment','notes'),
     date:    g('created_at','date').slice(0,16),
+    url:     g('beer_url','url'),
+    id:      g('checkin_id','id'),
   };
 }
 
@@ -717,7 +722,28 @@ function loadUntappd(text, name){
   }
   const items = raw.map(normaliseCheckin).filter(c=>c.beer);
   if(!items.length){ alert('Non ho trovato check-in in questo file.'); return; }
-  pending = pending.concat(items);
+
+  // firma univoca: l'id del check-in se c'è, altrimenti birra + data
+  const sig = c => c.id ? 'id:'+c.id : 'bd:'+(c.beer||'').toLowerCase()+'|'+(c.date||'');
+  const known = new Set();
+  Object.values(taste).forEach(list => list.forEach(t => known.add(sig(t))));
+  pending.forEach(c => known.add(sig(c)));
+
+  const fresh = [];
+  let skipped = 0;
+  items.forEach(c=>{
+    const s = sig(c);
+    if(known.has(s)){ skipped++; return; }
+    known.add(s);
+    fresh.push(c);
+  });
+
+  if(!fresh.length){
+    alert(`Nessuna novità: tutte le ${skipped} recensioni del file erano già inserite.`);
+    return;
+  }
+  pending = pending.concat(fresh);
+  lastSkipped = skipped;
   saveTaste();
   renderPanel();
   document.getElementById('importpanel').scrollIntoView({behavior:'smooth'});
@@ -731,7 +757,7 @@ function renderPanel(){
   panel.innerHTML = `
     <div class="panelhead">
       <strong>${pending.length} recensioni da assegnare</strong>
-      <span>Scegli tu a quale stile BJCP appartiene ciascuna birra.</span>
+      <span>Scegli tu a quale stile BJCP appartiene ciascuna birra.${lastSkipped?` <b class="skipnote">${lastSkipped} già inserite, ignorate.</b>`:''}</span>
       <button id="dropall" class="mini danger">Scarta tutte</button>
     </div>
     ${styleDatalist()}
@@ -774,7 +800,7 @@ document.getElementById('importpanel').addEventListener('click', e=>{
     const key = keyFromLabel(label);
     if(!key){ alert('Scegli uno stile dall\'elenco.'); return; }
     (taste[key] = taste[key] || []).push({
-      beer:c.beer, brewery:c.brewery, rating:c.rating, note:c.note, date:c.date, src:'untappd'
+      beer:c.beer, brewery:c.brewery, rating:c.rating, note:c.note, date:c.date, url:c.url, id:c.id, src:'untappd'
     });
     if(c.ustyle) learned[c.ustyle] = key;   // ricorda la TUA scelta per le prossime
     pending.splice(i,1);
@@ -793,28 +819,27 @@ function stars(r){
 }
 function renderTasting(el){
   const key = el.dataset.key, list = taste[key] || [];
+  if(!list.length){ el.hidden = true; el.innerHTML=''; return; }
+  el.hidden = false;
   el.innerHTML = `
-    <div class="tastehead">Le mie degustazioni${list.length?` <span>(${list.length})</span>`:''}</div>
-    ${list.map((t,i)=>`
+    <div class="tastehead">Le mie degustazioni <span>(${list.length})</span></div>
+    ${list.map((t,i)=>{
+      const href = t.url && /^https?:\/\//.test(t.url)
+        ? t.url
+        : beerUrl([t.beer, t.brewery].filter(Boolean).join(' '));
+      return `
       <div class="tnote">
         <div class="tline">
-          <b>${esc(t.beer)}</b>
+          <a class="tbeerlink" href="${esc(href)}" target="_blank" rel="noopener noreferrer"
+             title="Apri «${esc(t.beer)}»">${esc(t.beer)}</a>
           ${t.brewery?`<span class="tbrew">${esc(t.brewery)}</span>`:''}
-          ${t.rating?`<span class="tstars" title="${esc(t.rating)}">${stars(t.rating)}</span>`:''}
+          ${t.rating?`<span class="tstars">${stars(t.rating)}</span>`:''}
           ${t.date?`<span class="tdate">${esc(t.date)}</span>`:''}
           <button class="tdel" data-i="${i}" aria-label="Elimina">×</button>
         </div>
         ${t.note?`<p>${esc(t.note)}</p>`:''}
-      </div>`).join('')}
-    <div class="tadd">
-      <input class="tbeer" placeholder="birra assaggiata…" aria-label="Nome birra">
-      <select class="trate" aria-label="Voto">
-        <option value="">voto</option>
-        ${[5,4.5,4,3.5,3,2.5,2,1.5,1].map(v=>`<option value="${v}">${v}</option>`).join('')}
-      </select>
-      <input class="tcomment" placeholder="le tue note…" aria-label="Note">
-      <button class="mini tsave">Aggiungi</button>
-    </div>`;
+      </div>`;
+    }).join('')}`;
 }
 function refreshAllTasting(){ document.querySelectorAll('.tasting').forEach(renderTasting); }
 
@@ -827,25 +852,7 @@ results.addEventListener('click', e=>{
     if(!taste[el.dataset.key].length) delete taste[el.dataset.key];
     saveTaste(); renderTasting(el); return;
   }
-  if(e.target.classList.contains('tsave')){
-    e.stopPropagation();
-    const el = e.target.closest('.tasting');
-    const beer = el.querySelector('.tbeer').value.trim();
-    if(!beer){ el.querySelector('.tbeer').focus(); return; }
-    (taste[el.dataset.key] = taste[el.dataset.key] || []).push({
-      beer, rating: el.querySelector('.trate').value,
-      note: el.querySelector('.tcomment').value.trim(),
-      date: new Date().toISOString().slice(0,10), src:'manuale'
-    });
-    saveTaste(); renderTasting(el); return;
-  }
-  if(e.target.closest('.tadd')) e.stopPropagation();
-});
-results.addEventListener('keydown', e=>{
-  if(e.target.classList.contains('tbeer') || e.target.classList.contains('tcomment')){
-    e.stopPropagation();
-    if(e.key==='Enter') e.target.closest('.tadd').querySelector('.tsave').click();
-  }
+  if(e.target.closest('.tbeerlink')){ e.stopPropagation(); return; }
 });
 
 
@@ -891,3 +898,4 @@ updateEditBadge();
 </script>
 </body>
 </html>
+
