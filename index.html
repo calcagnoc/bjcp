@@ -337,7 +337,7 @@ mark{background:#FBE9A7;color:inherit;border-radius:2px;padding:0 1px}
   <div class="masthead-inner">
     <div class="brandline">
       <h1 class="brand">BJCP 2021 <em>· Linee guida stili birrari</em></h1>
-      <div class="tally"><b id="count">114</b> stili · <span id="catcount">34</span> categorie · <span class="ver">v20</span></div>
+      <div class="tally"><b id="count">114</b> stili · <span id="catcount">34</span> categorie · <span class="ver">v21</span></div>
     </div>
 
     <div class="searchwrap">
@@ -376,12 +376,12 @@ mark{background:#FBE9A7;color:inherit;border-radius:2px;padding:0 1px}
 <section id="syncpanel" hidden>
   <div class="syncbox">
     <strong>Sincronizzazione fra dispositivi</strong>
-    <p>Modo semplice: vai su <a href="https://jsonblob.com" target="_blank" rel="noopener">jsonblob.com</a>, sostituisci il contenuto con <code>{}</code>, premi Save e incolla qui l'indirizzo che ottieni. La passphrase non serve. In alternativa, incolla l'indirizzo di un Cloudflare Worker e scegli una passphrase.</p>
-    <label>Indirizzo (JSON Blob oppure Worker)
-      <input id="syncUrl" type="url" placeholder="https://jsonblob.com/1234567890123456789" autocomplete="off">
+    <p><b>Con GitHub (consigliato):</b> crea un repository <b>privato</b> (es. <code>bjcp-dati</code>), incolla qui il suo indirizzo e nel secondo campo un token con permesso di scrittura sui contenuti. I dati finiscono nel file <code>bjcp-dati.json</code> di quel repository. In alternativa funzionano un Cloudflare Worker (con passphrase) o un archivio JSON Blob (in sola lettura).</p>
+    <label>Indirizzo del repository, del Worker o di JSON Blob
+      <input id="syncUrl" type="url" placeholder="https://github.com/calcagnoc/bjcp-dati" autocomplete="off">
     </label>
-    <label>Passphrase (solo per il Worker, almeno 8 caratteri)
-      <input id="syncKey" type="text" placeholder="lascia vuoto se usi JSON Blob" autocomplete="off">
+    <label>Token GitHub, oppure passphrase del Worker
+      <input id="syncKey" type="password" placeholder="github_pat_..." autocomplete="off">
     </label>
     <div class="syncactions">
       <button id="syncSave" class="mini">Salva e collega</button>
@@ -935,6 +935,7 @@ results.addEventListener('click', e=>{
 
 
 /* ---------- sincronizzazione ---------- */
+const GH_API = 'https://api.github.com';
 const SYNC_URL_KEY = 'bjcp2021_syncurl_v1';
 const SYNC_PASS_KEY = 'bjcp2021_syncpass_v1';
 const UPDATED_KEY = 'bjcp2021_updated_v1';
@@ -946,6 +947,34 @@ try {
   localUpdated = localStorage.getItem(UPDATED_KEY) || '';
 } catch(e){}
 
+/* --- GitHub come archivio (scrittura consentita, repository privato) --- */
+const ghRepo = () => {
+  const m = String(syncUrl).match(/github\.com\/([^\/\s]+)\/([^\/\s#?]+)/i);
+  return m ? { owner: m[1], repo: m[2].replace(/\.git$/,'') } : null;
+};
+const isGh = () => !!ghRepo();
+const GH_FILE = 'bjcp-dati.json';
+const ghUrl = () => {
+  const r = ghRepo();
+  return GH_API + '/repos/' + r.owner + '/' + r.repo + '/contents/' + GH_FILE;
+};
+const ghHeaders = () => ({
+  'Authorization': 'Bearer ' + syncPass,
+  'Accept': 'application/vnd.github+json',
+  'Content-Type': 'application/json'
+});
+const b64encode = obj => {
+  const bytes = new TextEncoder().encode(JSON.stringify(obj));
+  let bin=''; bytes.forEach(b=>bin += String.fromCharCode(b));
+  return btoa(bin);
+};
+const b64decode = str => {
+  const bin = atob(String(str).replace(/\s/g,''));
+  const bytes = Uint8Array.from(bin, c=>c.charCodeAt(0));
+  return JSON.parse(new TextDecoder().decode(bytes));
+};
+let ghSha = null;
+
 const blobId = () => {
   const m = String(syncUrl).match(/jsonblob\.com\/(?:api\/jsonBlob\/)?([0-9a-fA-F-]{8,})/);
   return m ? m[1] : null;
@@ -953,7 +982,7 @@ const blobId = () => {
 const isBlob = () => !!blobId();
 const blobEndpoint = () => 'https://jsonblob.com/api/jsonBlob/' + blobId();
 
-const syncOn = () => isBlob() ? true : !!(syncUrl && syncPass);
+const syncOn = () => isGh() ? !!(syncUrl && syncPass) : (isBlob() ? true : !!(syncUrl && syncPass));
 
 function syncStatus(text, kind){
   const el = document.getElementById('syncstatus');
@@ -1003,7 +1032,17 @@ async function syncPush(silent){
   if(!syncOn()) return;
   syncStatus('invio…');
   try{
-    const r = isBlob()
+    let r;
+    if(isGh()){
+      if(ghSha === null){                     // recupero lo sha corrente, se il file esiste
+        const probe = await fetch(ghUrl(), { headers: ghHeaders() });
+        if(probe.ok){ const j = await probe.json(); ghSha = j.sha; }
+      }
+      const payload = { message:'aggiornamento dati BJCP', content: b64encode(snapshot()) };
+      if(ghSha) payload.sha = ghSha;
+      r = await fetch(ghUrl(), { method:'PUT', headers: ghHeaders(), body: JSON.stringify(payload) });
+      if(r.ok){ const j = await r.json(); ghSha = j.content && j.content.sha; }
+    } else r = isBlob()
       ? await fetch(blobEndpoint(), {
           method:'PUT', headers:{'Content-Type':'application/json'},
           body: JSON.stringify(snapshot())
@@ -1027,11 +1066,19 @@ async function syncPull(silent){
   if(!syncOn()) return;
   syncStatus('lettura…');
   try{
-    const r = isBlob()
-      ? await fetch(blobEndpoint())
-      : await fetch(syncUrl + '?k=' + encodeURIComponent(syncPass));
-    if(!r.ok) throw new Error('risposta ' + r.status);
-    const doc = await r.json();
+    let doc;
+    if(isGh()){
+      const r = await fetch(ghUrl(), { headers: ghHeaders() });
+      if(r.status === 404){ ghSha = null; doc = {}; }
+      else if(!r.ok){ throw new Error(r.status === 401 ? 'token non valido' : 'risposta ' + r.status); }
+      else { const j = await r.json(); ghSha = j.sha; doc = b64decode(j.content); }
+    } else {
+      const r = isBlob()
+        ? await fetch(blobEndpoint())
+        : await fetch(syncUrl + '?k=' + encodeURIComponent(syncPass));
+      if(!r.ok) throw new Error('risposta ' + r.status);
+      doc = await r.json();
+    }
     if(doc.error) throw new Error(doc.error);
     if(!doc.updated){
       syncStatus('nessun dato remoto');
@@ -1084,7 +1131,9 @@ document.getElementById('syncSave').onclick = async ()=>{
   syncUrl  = document.getElementById('syncUrl').value.trim().replace(/\/+$/,'');
   syncPass = document.getElementById('syncKey').value.trim();
   if(!/^https?:\/\//.test(syncUrl)){ syncMsg('L\'indirizzo deve iniziare con https://', 'err'); return; }
-  if(!isBlob() && syncPass.length < 8){ syncMsg('Con un Worker serve una passphrase di almeno 8 caratteri.', 'err'); return; }
+  if(isGh() && !syncPass){ syncMsg('Con GitHub serve il token nel secondo campo.', 'err'); return; }
+  if(!isBlob() && !isGh() && syncPass.length < 8){ syncMsg('Con un Worker serve una passphrase di almeno 8 caratteri.', 'err'); return; }
+  ghSha = null;
   try{
     localStorage.setItem(SYNC_URL_KEY, syncUrl);
     localStorage.setItem(SYNC_PASS_KEY, syncPass);
