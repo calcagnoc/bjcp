@@ -337,7 +337,7 @@ mark{background:#FBE9A7;color:inherit;border-radius:2px;padding:0 1px}
   <div class="masthead-inner">
     <div class="brandline">
       <h1 class="brand">BJCP 2021 <em>· Linee guida stili birrari</em></h1>
-      <div class="tally"><b id="count">114</b> stili · <span id="catcount">34</span> categorie · <span class="ver">v19</span></div>
+      <div class="tally"><b id="count">114</b> stili · <span id="catcount">34</span> categorie · <span class="ver">v20</span></div>
     </div>
 
     <div class="searchwrap">
@@ -387,6 +387,7 @@ mark{background:#FBE9A7;color:inherit;border-radius:2px;padding:0 1px}
       <button id="syncSave" class="mini">Salva e collega</button>
       <button id="syncPush" class="mini">Invia ora</button>
       <button id="syncPull" class="mini">Scarica ora</button>
+      <button id="syncRestore" class="mini">Ripristina copia locale</button>
       <button id="syncOff" class="mini danger">Scollega</button>
       <button id="syncClose" class="mini">Chiudi</button>
     </div>
@@ -968,7 +969,18 @@ function syncMsg(text, kind){
 function snapshot(){
   return {v:2, updated: localUpdated, ingredienti:store, degustazioni:taste, mappature:learned};
 }
+const BACKUP_KEY = 'bjcp2021_backup_v1';
+function makeBackup(){
+  try{
+    const t = Object.values(taste||{}).reduce((a,b)=>a+b.length,0);
+    if(!t && !Object.keys(store||{}).length) return;
+    localStorage.setItem(BACKUP_KEY, JSON.stringify({
+      when:new Date().toISOString(), ingredienti:store, degustazioni:taste, mappature:learned
+    }));
+  }catch(e){}
+}
 function adopt(doc){
+  makeBackup();
   store   = doc.ingredienti  || {};
   taste   = doc.degustazioni || {};
   learned = doc.mappature    || {};
@@ -1025,6 +1037,15 @@ async function syncPull(silent){
       syncStatus('nessun dato remoto');
       if(!silent) syncMsg('Sul servizio non c\'è ancora nulla: usa "Invia ora" per caricare i tuoi dati.', 'ok');
       return;
+    }
+    const remoteCount = Object.values(doc.degustazioni||{}).reduce((a,b)=>a+b.length,0);
+    const localCount  = Object.values(taste||{}).reduce((a,b)=>a+b.length,0);
+    if(remoteCount < localCount){
+      syncStatus('remoto piu\u2019 povero','err');
+      const msg = `Attenzione: il servizio contiene ${remoteCount} degustazioni, questo dispositivo ne ha ${localCount}. `
+        + `Scaricare cancellerebbe dati locali.`;
+      if(silent){ syncMsg(msg + ' Ho lasciato intatti i dati locali.', 'err'); return; }
+      if(!confirm(msg + '\n\nProcedo comunque?')){ syncMsg('Scaricamento annullato: i dati locali sono intatti.','ok'); return; }
     }
     if(!localUpdated || doc.updated > localUpdated){
       adopt(doc);
@@ -1084,6 +1105,22 @@ function adoptFields(){
 }
 document.getElementById('syncPush').onclick = ()=>{ adoptFields(); touch(); syncPush(false); };
 document.getElementById('syncPull').onclick = ()=>{ adoptFields(); syncPull(false); };
+document.getElementById('syncRestore').onclick = ()=>{
+  let bk=null;
+  try{ bk = JSON.parse(localStorage.getItem(BACKUP_KEY)||'null'); }catch(e){}
+  if(!bk){ syncMsg('Nessuna copia di sicurezza disponibile su questo dispositivo.','err'); return; }
+  const n = Object.values(bk.degustazioni||{}).reduce((a,b)=>a+b.length,0);
+  if(!confirm(`Ripristino la copia del ${new Date(bk.when).toLocaleString('it-IT')} con ${n} degustazioni?`)) return;
+  store = bk.ingredienti||{}; taste = bk.degustazioni||{}; learned = bk.mappature||{};
+  touch();
+  try{
+    localStorage.setItem(STORE_KEY, JSON.stringify(store));
+    localStorage.setItem(TASTE_KEY, JSON.stringify(taste));
+    localStorage.setItem(MAP_KEY, JSON.stringify(learned));
+  }catch(e){}
+  refreshAllIngRows(); refreshAllTasting(); updateEditBadge();
+  syncMsg(`Ripristinate ${n} degustazioni.`,'ok');
+};
 document.getElementById('syncOff').onclick = ()=>{
   syncUrl=''; syncPass='';
   try{ localStorage.removeItem(SYNC_URL_KEY); localStorage.removeItem(SYNC_PASS_KEY); }catch(e){}
