@@ -245,6 +245,13 @@ a.beer:focus-visible{outline:2px solid var(--focus);outline-offset:1px}
 .tdel{border:0;background:transparent;color:var(--muted);cursor:pointer;font-size:17px;line-height:1;padding:0 4px;border-radius:4px}
 .tdel:hover{color:#B03A2E;background:var(--enamel-deep)}
 .tnote p{margin:4px 0 0;font-size:13.5px;color:var(--ink-soft)}
+.tbadge{
+  display:inline-flex;align-items:center;justify-content:center;
+  min-width:22px;height:22px;padding:0 6px;align-self:flex-start;
+  border-radius:999px;background:#2E7D4F;color:#fff;
+  font-family:var(--mono);font-size:12px;font-weight:700;line-height:1;
+}
+.tbadge[hidden]{display:none}
 .tbeerlink{
   font-weight:700;font-size:14px;color:var(--ink);text-decoration:none;
   border-bottom:1px solid var(--rule);
@@ -294,7 +301,7 @@ mark{background:#FBE9A7;color:inherit;border-radius:2px;padding:0 1px}
   <div class="masthead-inner">
     <div class="brandline">
       <h1 class="brand">BJCP 2021 <em>· Linee guida stili birrari</em></h1>
-      <div class="tally"><b id="count">114</b> stili · <span id="catcount">34</span> categorie · <span class="ver">v11</span></div>
+      <div class="tally"><b id="count">114</b> stili · <span id="catcount">34</span> categorie · <span class="ver">v13</span></div>
     </div>
 
     <div class="searchwrap">
@@ -598,14 +605,14 @@ function render(){
       + ingLine(ICON.other, 'Altri', 'other')
       + `</div>`;
 
-    return `<article class="style" data-i="${i}">
+    return `<article class="style" data-i="${i}" data-key="${esc(keyOf(d))}">
       <button class="row" aria-expanded="false">
         ${sw}${code}
         <span class="namecell">
           <span class="name">${mark(d.name, term)}</span>
           <span class="cat">${mark(d.cat, term)}</span>
         </span>
-        <span class="stats">${statBlock('IBU', d.ibu)}${statBlock('ABV', d.abv)}</span>
+        <span class="stats"><span class="tbadge" hidden></span>${statBlock('IBU', d.ibu)}${statBlock('ABV', d.abv)}</span>
       </button>
       <div class="detail"><dl>${body}${ex}</dl>${ing}<div class="tasting" data-key="${esc(keyOf(d))}"></div>${srm}</div>
     </article>`;
@@ -841,7 +848,17 @@ function renderTasting(el){
       </div>`;
     }).join('')}`;
 }
-function refreshAllTasting(){ document.querySelectorAll('.tasting').forEach(renderTasting); }
+function refreshBadges(){
+  document.querySelectorAll('.style').forEach(a=>{
+    const n = (taste[a.dataset.key] || []).length;
+    const b = a.querySelector('.tbadge');
+    if(!b) return;
+    b.textContent = n;
+    b.hidden = !n;
+    b.title = n === 1 ? '1 birra degustata' : n + ' birre degustate';
+  });
+}
+function refreshAllTasting(){ document.querySelectorAll('.tasting').forEach(renderTasting); refreshBadges(); }
 
 results.addEventListener('click', e=>{
   const del = e.target.closest('.tdel');
@@ -850,7 +867,7 @@ results.addEventListener('click', e=>{
     const el = del.closest('.tasting');
     taste[el.dataset.key].splice(+del.dataset.i,1);
     if(!taste[el.dataset.key].length) delete taste[el.dataset.key];
-    saveTaste(); renderTasting(el); return;
+    saveTaste(); renderTasting(el); refreshBadges(); return;
   }
   if(e.target.closest('.tbeerlink')){ e.stopPropagation(); return; }
 });
@@ -898,4 +915,5 @@ updateEditBadge();
 </script>
 </body>
 </html>
+
 
