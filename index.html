@@ -215,6 +215,17 @@ a.beer:focus-visible{outline:2px solid var(--focus);outline-offset:1px}
 .panelhead .mini{margin-left:auto}
 .skipnote{color:#8A6D1F}
 
+/* ---------- piè di pagina ---------- */
+.pagefoot{
+  max-width:1080px;margin:0 auto;padding:26px 20px 40px;
+  border-top:1px solid var(--rule);
+  display:flex;flex-direction:column;gap:5px;
+  font-size:12px;color:var(--muted);line-height:1.5;
+}
+.pagefoot a{color:var(--brass);text-decoration:none;border-bottom:1px solid transparent}
+.pagefoot a:hover{border-bottom-color:var(--brass)}
+.pagefoot code{font-family:var(--mono);font-size:11px;background:var(--enamel-deep);padding:1px 4px;border-radius:3px}
+
 /* ---------- pannello sync ---------- */
 #syncpanel{max-width:1080px;margin:16px auto 0;padding:0 20px}
 #syncpanel[hidden]{display:none}
@@ -326,7 +337,7 @@ mark{background:#FBE9A7;color:inherit;border-radius:2px;padding:0 1px}
   <div class="masthead-inner">
     <div class="brandline">
       <h1 class="brand">BJCP 2021 <em>· Linee guida stili birrari</em></h1>
-      <div class="tally"><b id="count">114</b> stili · <span id="catcount">34</span> categorie · <span class="ver">v16</span></div>
+      <div class="tally"><b id="count">114</b> stili · <span id="catcount">34</span> categorie · <span class="ver">v19</span></div>
     </div>
 
     <div class="searchwrap">
@@ -935,7 +946,7 @@ try {
 } catch(e){}
 
 const blobId = () => {
-  const m = String(syncUrl).match(/jsonblob\.com\/(?:api\/jsonBlob\/)?([0-9a-f-]+)/i);
+  const m = String(syncUrl).match(/jsonblob\.com\/(?:api\/jsonBlob\/)?([0-9a-fA-F-]{8,})/);
   return m ? m[1] : null;
 };
 const isBlob = () => !!blobId();
@@ -1060,8 +1071,19 @@ document.getElementById('syncSave').onclick = async ()=>{
   syncMsg('Collegato. Controllo il servizio…','ok');
   await syncPull(false);
 };
-document.getElementById('syncPush').onclick = ()=>{ touch(); syncPush(false); };
-document.getElementById('syncPull').onclick = ()=> syncPull(false);
+function adoptFields(){
+  const u = document.getElementById('syncUrl').value.trim().replace(/\/+$/,'');
+  const k = document.getElementById('syncKey').value.trim();
+  if(u !== syncUrl || k !== syncPass){
+    syncUrl = u; syncPass = k;
+    try{
+      localStorage.setItem(SYNC_URL_KEY, syncUrl);
+      localStorage.setItem(SYNC_PASS_KEY, syncPass);
+    }catch(e){}
+  }
+}
+document.getElementById('syncPush').onclick = ()=>{ adoptFields(); touch(); syncPush(false); };
+document.getElementById('syncPull').onclick = ()=>{ adoptFields(); syncPull(false); };
 document.getElementById('syncOff').onclick = ()=>{
   syncUrl=''; syncPass='';
   try{ localStorage.removeItem(SYNC_URL_KEY); localStorage.removeItem(SYNC_PASS_KEY); }catch(e){}
@@ -1109,7 +1131,12 @@ renderPanel();
 updateEditBadge();
 if(syncOn()) syncPull(true);
 </script>
+<footer class="pagefoot">
+  <span>Per pubblicare una nuova versione:
+    <a href="https://github.com/calcagnoc/bjcp/upload/main" target="_blank" rel="noopener">carica <code>index.html</code> su GitHub</a>
+    · <a href="https://github.com/calcagnoc/bjcp" target="_blank" rel="noopener">repository</a>
+  </span>
+  <span>Testi © 2021 BJCP, Inc. — traduzione italiana a cura degli IBU, Ichnos Beer Union. Uso didattico.</span>
+</footer>
 </body>
 </html>
-
-
