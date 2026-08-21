@@ -214,6 +214,29 @@ a.beer:focus-visible{outline:2px solid var(--focus);outline-offset:1px}
 .panelhead strong{font-size:14px;color:var(--ink)}
 .panelhead .mini{margin-left:auto}
 .skipnote{color:#8A6D1F}
+
+/* ---------- pannello sync ---------- */
+#syncpanel{max-width:1080px;margin:16px auto 0;padding:0 20px}
+#syncpanel[hidden]{display:none}
+.syncbox{background:var(--card);border:1px solid var(--rule);border-radius:8px;padding:16px 18px;box-shadow:var(--shadow)}
+.syncbox strong{font-size:15px}
+.syncbox p{margin:5px 0 12px;font-size:13px;color:var(--muted);max-width:70ch;line-height:1.5}
+.syncbox p a{color:var(--brass)}
+.syncbox code{font-family:var(--mono);background:var(--enamel);padding:1px 4px;border-radius:3px}
+.syncbox label{display:block;font-size:12px;color:var(--muted);margin-bottom:9px}
+.syncbox input{
+  display:block;width:100%;max-width:460px;margin-top:3px;
+  font:inherit;font-size:13.5px;padding:7px 10px;
+  border:1px solid var(--rule);border-radius:6px;background:#fff;color:var(--ink);
+}
+.syncbox input:focus{outline:2px solid var(--focus);outline-offset:1px}
+.syncactions{display:flex;gap:7px;flex-wrap:wrap;margin-top:12px}
+#syncmsg{margin-top:10px;font-size:13px}
+#syncmsg.ok{color:#2E7D4F}
+#syncmsg.err{color:#B03A2E}
+#syncstatus{font-family:var(--mono);font-size:11px;color:var(--muted)}
+#syncstatus.err{color:#B03A2E}
+@media (max-width:640px){ #syncpanel{padding:0 16px} }
 .pend{
   display:flex;align-items:center;gap:9px;flex-wrap:wrap;
   background:var(--card);border:1px solid var(--rule);border-top:0;
@@ -303,7 +326,7 @@ mark{background:#FBE9A7;color:inherit;border-radius:2px;padding:0 1px}
   <div class="masthead-inner">
     <div class="brandline">
       <h1 class="brand">BJCP 2021 <em>· Linee guida stili birrari</em></h1>
-      <div class="tally"><b id="count">114</b> stili · <span id="catcount">34</span> categorie · <span class="ver">v14</span></div>
+      <div class="tally"><b id="count">114</b> stili · <span id="catcount">34</span> categorie · <span class="ver">v16</span></div>
     </div>
 
     <div class="searchwrap">
@@ -326,6 +349,8 @@ mark{background:#FBE9A7;color:inherit;border-radius:2px;padding:0 1px}
           </select>
         </label>
         <span id="edits">nessuna modifica</span>
+        <button id="syncBtn" class="mini">☁ Sync</button>
+        <span id="syncstatus"></span>
         <button id="impUntappd" class="mini">Importa Untappd</button>
         <input type="file" id="untappdFile" accept=".json,.csv,application/json,text/csv" hidden>
         <button id="export" class="mini">Esporta</button>
@@ -337,6 +362,26 @@ mark{background:#FBE9A7;color:inherit;border-radius:2px;padding:0 1px}
   </div>
 </header>
 
+<section id="syncpanel" hidden>
+  <div class="syncbox">
+    <strong>Sincronizzazione fra dispositivi</strong>
+    <p>Modo semplice: vai su <a href="https://jsonblob.com" target="_blank" rel="noopener">jsonblob.com</a>, sostituisci il contenuto con <code>{}</code>, premi Save e incolla qui l'indirizzo che ottieni. La passphrase non serve. In alternativa, incolla l'indirizzo di un Cloudflare Worker e scegli una passphrase.</p>
+    <label>Indirizzo (JSON Blob oppure Worker)
+      <input id="syncUrl" type="url" placeholder="https://jsonblob.com/1234567890123456789" autocomplete="off">
+    </label>
+    <label>Passphrase (solo per il Worker, almeno 8 caratteri)
+      <input id="syncKey" type="text" placeholder="lascia vuoto se usi JSON Blob" autocomplete="off">
+    </label>
+    <div class="syncactions">
+      <button id="syncSave" class="mini">Salva e collega</button>
+      <button id="syncPush" class="mini">Invia ora</button>
+      <button id="syncPull" class="mini">Scarica ora</button>
+      <button id="syncOff" class="mini danger">Scollega</button>
+      <button id="syncClose" class="mini">Chiudi</button>
+    </div>
+    <div id="syncmsg"></div>
+  </div>
+</section>
 <section id="importpanel" hidden></section>
 <main id="list" role="region" aria-live="polite"></main>
 
@@ -447,6 +492,7 @@ function saveStore(){
     alert('Non riesco a salvare in questo browser. Usa "Esporta" per conservare le tue modifiche.');
   }
   updateEditBadge();
+  if(typeof scheduleSync === 'function') scheduleSync();
 }
 
 function listFor(key, kind){
@@ -661,6 +707,7 @@ function saveTaste(){
     localStorage.setItem(MAP_KEY,   JSON.stringify(learned));
   }catch(e){ alert('Spazio esaurito nel browser: usa Esporta per salvare.'); }
   updateEditBadge();
+  if(typeof scheduleSync === 'function') scheduleSync();
 }
 
 const STYLE_OPTIONS = DATA.map(d=>({
@@ -875,6 +922,152 @@ results.addEventListener('click', e=>{
 });
 
 
+/* ---------- sincronizzazione ---------- */
+const SYNC_URL_KEY = 'bjcp2021_syncurl_v1';
+const SYNC_PASS_KEY = 'bjcp2021_syncpass_v1';
+const UPDATED_KEY = 'bjcp2021_updated_v1';
+
+let syncUrl = '', syncPass = '', localUpdated = '';
+try {
+  syncUrl = localStorage.getItem(SYNC_URL_KEY) || '';
+  syncPass = localStorage.getItem(SYNC_PASS_KEY) || '';
+  localUpdated = localStorage.getItem(UPDATED_KEY) || '';
+} catch(e){}
+
+const blobId = () => {
+  const m = String(syncUrl).match(/jsonblob\.com\/(?:api\/jsonBlob\/)?([0-9a-f-]+)/i);
+  return m ? m[1] : null;
+};
+const isBlob = () => !!blobId();
+const blobEndpoint = () => 'https://jsonblob.com/api/jsonBlob/' + blobId();
+
+const syncOn = () => isBlob() ? true : !!(syncUrl && syncPass);
+
+function syncStatus(text, kind){
+  const el = document.getElementById('syncstatus');
+  el.textContent = text || '';
+  el.className = kind || '';
+}
+function syncMsg(text, kind){
+  const el = document.getElementById('syncmsg');
+  el.textContent = text || '';
+  el.className = kind || '';
+}
+
+function snapshot(){
+  return {v:2, updated: localUpdated, ingredienti:store, degustazioni:taste, mappature:learned};
+}
+function adopt(doc){
+  store   = doc.ingredienti  || {};
+  taste   = doc.degustazioni || {};
+  learned = doc.mappature    || {};
+  localUpdated = doc.updated || new Date().toISOString();
+  try{
+    localStorage.setItem(STORE_KEY, JSON.stringify(store));
+    localStorage.setItem(TASTE_KEY, JSON.stringify(taste));
+    localStorage.setItem(MAP_KEY,   JSON.stringify(learned));
+    localStorage.setItem(UPDATED_KEY, localUpdated);
+  }catch(e){}
+  refreshAllIngRows(); refreshAllTasting(); updateEditBadge();
+}
+
+function touch(){
+  localUpdated = new Date().toISOString();
+  try{ localStorage.setItem(UPDATED_KEY, localUpdated); }catch(e){}
+}
+
+async function syncPush(silent){
+  if(!syncOn()) return;
+  syncStatus('invio…');
+  try{
+    const r = isBlob()
+      ? await fetch(blobEndpoint(), {
+          method:'PUT', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify(snapshot())
+        })
+      : await fetch(syncUrl + '?k=' + encodeURIComponent(syncPass), {
+          method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify(snapshot())
+        });
+    if(!r.ok) throw new Error('risposta ' + r.status);
+    const j = await r.json().catch(()=>({}));
+    if(j && j.error) throw new Error(j.error);
+    syncStatus('salvato ' + new Date().toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'}));
+    if(!silent) syncMsg('Dati inviati correttamente.', 'ok');
+  }catch(e){
+    syncStatus('errore invio','err');
+    if(!silent) syncMsg('Invio non riuscito: ' + e.message, 'err');
+  }
+}
+
+async function syncPull(silent){
+  if(!syncOn()) return;
+  syncStatus('lettura…');
+  try{
+    const r = isBlob()
+      ? await fetch(blobEndpoint())
+      : await fetch(syncUrl + '?k=' + encodeURIComponent(syncPass));
+    if(!r.ok) throw new Error('risposta ' + r.status);
+    const doc = await r.json();
+    if(doc.error) throw new Error(doc.error);
+    if(!doc.updated){
+      syncStatus('nessun dato remoto');
+      if(!silent) syncMsg('Sul servizio non c\'è ancora nulla: usa "Invia ora" per caricare i tuoi dati.', 'ok');
+      return;
+    }
+    if(!localUpdated || doc.updated > localUpdated){
+      adopt(doc);
+      syncStatus('aggiornato dal cloud');
+      if(!silent) syncMsg('Scaricata la versione più recente.', 'ok');
+    } else {
+      syncStatus('già aggiornato');
+      if(!silent) syncMsg('I dati locali sono già i più recenti.', 'ok');
+    }
+  }catch(e){
+    syncStatus('errore lettura','err');
+    if(!silent) syncMsg('Lettura non riuscita: ' + e.message, 'err');
+  }
+}
+
+let syncTimer = null;
+function scheduleSync(){
+  touch();
+  if(!syncOn()) return;
+  clearTimeout(syncTimer);
+  syncTimer = setTimeout(()=>syncPush(true), 1500);
+}
+
+/* pannello */
+const syncPanel = document.getElementById('syncpanel');
+document.getElementById('syncBtn').onclick = ()=>{
+  syncPanel.hidden = !syncPanel.hidden;
+  if(!syncPanel.hidden){
+    document.getElementById('syncUrl').value = syncUrl;
+    document.getElementById('syncKey').value = syncPass;
+    syncMsg('');
+  }
+};
+document.getElementById('syncClose').onclick = ()=>{ syncPanel.hidden = true; };
+document.getElementById('syncSave').onclick = async ()=>{
+  syncUrl  = document.getElementById('syncUrl').value.trim().replace(/\/+$/,'');
+  syncPass = document.getElementById('syncKey').value.trim();
+  if(!/^https?:\/\//.test(syncUrl)){ syncMsg('L\'indirizzo deve iniziare con https://', 'err'); return; }
+  if(!isBlob() && syncPass.length < 8){ syncMsg('Con un Worker serve una passphrase di almeno 8 caratteri.', 'err'); return; }
+  try{
+    localStorage.setItem(SYNC_URL_KEY, syncUrl);
+    localStorage.setItem(SYNC_PASS_KEY, syncPass);
+  }catch(e){}
+  syncMsg('Collegato. Controllo il servizio…','ok');
+  await syncPull(false);
+};
+document.getElementById('syncPush').onclick = ()=>{ touch(); syncPush(false); };
+document.getElementById('syncPull').onclick = ()=> syncPull(false);
+document.getElementById('syncOff').onclick = ()=>{
+  syncUrl=''; syncPass='';
+  try{ localStorage.removeItem(SYNC_URL_KEY); localStorage.removeItem(SYNC_PASS_KEY); }catch(e){}
+  syncStatus(''); syncMsg('Sincronizzazione disattivata su questo dispositivo.','ok');
+};
+
 document.getElementById('export').onclick = ()=>{
   const payload = {v:2, ingredienti:store, degustazioni:taste, mappature:learned};
   const blob = new Blob([JSON.stringify(payload,null,2)], {type:'application/json'});
@@ -914,9 +1107,9 @@ document.getElementById('reset').onclick = ()=>{
 render();
 renderPanel();
 updateEditBadge();
+if(syncOn()) syncPull(true);
 </script>
 </body>
 </html>
-
 
 
