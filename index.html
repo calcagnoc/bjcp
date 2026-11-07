@@ -127,7 +127,7 @@ h1, h2, h3 { margin: 0; font-weight: 400; text-wrap: balance; }
 <script>
 (function () {
   var app = document.getElementById('app');
-  var DATA = null;
+  function exHref(n){var w='https://untappd.com/search?q='+encodeURIComponent(n);return /Android/i.test(navigator.userAgent)?'intent://untappd.com/search?q='+encodeURIComponent(n)+'#Intent;scheme=https;package=com.untappdllc.app;S.browser_fallback_url='+encodeURIComponent(w)+';end':w;}  var DATA = null;
 
   // Colore della birra: tabella SRM standard, interpolata per i valori con decimali
   var SRM = ['#FFE699','#FFD878','#FFCA5A','#FFBF42','#FBB123','#F8A600','#F39C00','#EA8F00','#E58500','#DE7C00',
@@ -235,7 +235,7 @@ h1, h2, h3 { margin: 0; font-weight: 400; text-wrap: balance; }
       sec('Aroma', s.aroma) + sec('Aspetto', s.aspetto) + sec('Sapore', s.sapore) + sec('Corpo e carbonazione', s.corpo) +
       sec('Commenti', s.commenti) + sec('Storia', s.storia) + sec('Ingredienti caratteristici', s.ingredienti) + sec('Confronti di stile', s.confronti) + sec('Istruzioni per l\'iscrizione', s.iscrizione) +
       paramsHTML(s) +
-      (s.esempi && s.esempi.length ? '<div class="sec"><h2>Esempi commerciali</h2><div class="chips">' + (s.esempi || []).map(function (e) { var n = e.split('. ')[0].replace(/\.$/, '').trim(); return '<a class="ex" href="https://untappd.com/search?q=' + encodeURIComponent(n) + '" target="_blank" rel="noopener">' + esc(n) + '</a>'; }).join('') + '</div></div>' : '') +
+      (s.esempi && s.esempi.length ? '<div class="sec"><h2>Esempi commerciali</h2><div class="chips">' + (s.esempi || []).map(function (e) { var n = e.split('. ')[0].replace(/\.$/, '').trim(); return '<a class="ex" href="' + exHref(n) + '" target="_blank" rel="noopener">' + esc(n) + '</a>'; }).join('') + '</div></div>' : '') +
       '<p class="foot">Descrizioni riassunte a partire dalle Linee Guida Stili BJCP 2021 (traduzione italiana IBU). I parametri tecnici sono quelli ufficiali.</p>';
   }
 
