@@ -127,7 +127,7 @@ h1, h2, h3 { margin: 0; font-weight: 400; text-wrap: balance; }
 <script>
 (function () {
   var app = document.getElementById('app');
-  function exHref(n){var w='https://untappd.com/search?q='+encodeURIComponent(n);return /Android/i.test(navigator.userAgent)?'intent://untappd.com/search?q='+encodeURIComponent(n)+'#Intent;scheme=https;package=com.untappdllc.app;S.browser_fallback_url='+encodeURIComponent(w)+';end':w;}  var DATA = null;
+  var UT={}; fetch('untappd.json').then(function(r){return r.json()}).then(function(m){UT=m||{};}).catch(function(){}); function exHref(n){var p=UT[n]; var w=p?'https://untappd.com'+p:'https://untappd.com/search?q='+encodeURIComponent(n); if(!/Android/i.test(navigator.userAgent)) return w; var path=p?p:'/search?q='+encodeURIComponent(n); return 'intent://untappd.com'+path+'#Intent;scheme=https;package=com.untappdllc.app;S.browser_fallback_url='+encodeURIComponent(w)+';end';}  var DATA = null;
 
   // Colore della birra: tabella SRM standard, interpolata per i valori con decimali
   var SRM = ['#FFE699','#FFD878','#FFCA5A','#FFBF42','#FBB123','#F8A600','#F39C00','#EA8F00','#E58500','#DE7C00',
